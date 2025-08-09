@@ -184,6 +184,9 @@ fun DrawingApp() {
                                         }) { Icon(Icons.Filled.Download, contentDescription = "Export SVG") }
                                 }
 
+                                // Spacer to push the canvas in the middle
+                                Spacer(Modifier.weight(1f))
+
                                 // ---- Canvas (size reacts to exportSize) ----
                                 Box(
                                         modifier = Modifier
@@ -229,6 +232,9 @@ fun DrawingApp() {
                                                 }
                                         }
                                 }
+
+                                // Spacer to push the canvas in the middle
+                                Spacer(Modifier.weight(1f))
                         }
                 }
         }
