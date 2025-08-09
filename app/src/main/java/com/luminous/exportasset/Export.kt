@@ -43,9 +43,18 @@ private fun densifyNormalized(
 }
 
 // ---- Renderers ----
-fun renderBitmap(strokes: List<StrokeData>, width: Int, height: Int): Bitmap {
+fun renderBitmap(
+    strokes: List<StrokeData>,
+    width: Int,
+    height: Int,
+    backgroundColor: Int? = null
+): Bitmap {
     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bmp)
+
+    // Fill background if requested (keeps alpha if null)
+    if (backgroundColor != null) canvas.drawColor(backgroundColor)
+
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -83,12 +92,30 @@ private fun Color.toSvgHex(): String {
     return String.format("#%02X%02X%02X", r, g, b)
 }
 
-fun renderSvg(strokes: List<StrokeData>, width: Int, height: Int): String {
+// ARGB Int -> "#RRGGBB" (alpha ignored; good for solid fills)
+private fun Int.toSvgHex(): String {
+    val r = (this ushr 16) and 0xFF
+    val g = (this ushr 8) and 0xFF
+    val b = this and 0xFF
+    return String.format("#%02X%02X%02X", r, g, b)
+}
+
+fun renderSvg(
+    strokes: List<StrokeData>,
+    width: Int,
+    height: Int,
+    backgroundColor: Int? = null // null => transparent
+): String {
     val sb = StringBuilder()
 
     sb.append(
         """<svg xmlns="http://www.w3.org/2000/svg" width="$width" height="$height" viewBox="0 0 $width $height" shape-rendering="geometricPrecision">"""
     )
+
+    // Solid background if requested
+    if (backgroundColor != null) {
+        sb.append("""<rect width="100%" height="100%" fill="${backgroundColor.toSvgHex()}" />""")
+    }
 
     val minDim = min(width, height).toFloat()
 
