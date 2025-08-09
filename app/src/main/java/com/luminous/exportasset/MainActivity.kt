@@ -60,7 +60,7 @@ fun DrawingApp() {
     // --- simple preview size map so the on-screen canvas changes with dropdown ---
     val previewSizeDp = remember(exportSize) {
         when (exportSize) {
-            128 -> 220.dp
+            128 -> (128 / context.resources.displayMetrics.density).dp
             256 -> 300.dp
             512 -> 360.dp
             else -> 400.dp        // 1024

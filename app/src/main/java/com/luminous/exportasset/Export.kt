@@ -10,7 +10,37 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import kotlin.math.min
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import kotlin.math.*
+
+private fun densifyNormalized(
+    points: List<Offset>,
+    width: Int,
+    height: Int,
+    maxGapPx: Float = 1.5f
+): List<Offset> {
+    if (points.size < 2) return points
+    val out = ArrayList<Offset>(points.size * 2)
+    out += points.first()
+    for (i in 1 until points.size) {
+        val a = points[i - 1]
+        val b = points[i]
+        val dxPx = (b.x - a.x) * width
+        val dyPx = (b.y - a.y) * height
+        val distPx = hypot(dxPx, dyPx)
+        val steps = floor(distPx / maxGapPx).toInt()
+        if (steps > 0) {
+            for (s in 1..steps) {
+                val t = s / (steps + 1f)
+                out += Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+            }
+        }
+        out += b
+    }
+    return out
+}
 
 // ---- Renderers ----
 fun renderBitmap(strokes: List<StrokeData>, width: Int, height: Int): Bitmap {
@@ -22,49 +52,61 @@ fun renderBitmap(strokes: List<StrokeData>, width: Int, height: Int): Bitmap {
         strokeJoin = Paint.Join.ROUND
         color = android.graphics.Color.BLACK
     }
+
     val minDim = min(width, height).toFloat()
+
     strokes.forEach { s ->
+        val pts = densifyNormalized(s.points, width, height)  // <— key line
+        if (pts.isEmpty()) return@forEach
+
         val p = AndroidPath()
-        if (s.points.isNotEmpty()) {
-            val f = s.points.first()
-            p.moveTo(f.x * width, f.y * height)
-            for (i in 1 until s.points.size) {
-                val pt = s.points[i]
-                p.lineTo(pt.x * width, pt.y * height)
-            }
-            paint.strokeWidth = s.widthFraction * minDim
-            canvas.drawPath(p, paint)
+        p.moveTo(pts.first().x * width, pts.first().y * height)
+        for (i in 1 until pts.size) {
+            val pt = pts[i]
+            p.lineTo(pt.x * width, pt.y * height)
         }
+
+        paint.color = s.color.toArgb()                         // respect stroke color
+        paint.strokeWidth = s.widthFraction * minDim
+        canvas.drawPath(p, paint)
     }
+
     return bmp
+}
+
+private fun Color.toSvgHex(): String {
+    // outputs #RRGGBB (alpha ignored in SVG stroke here)
+    val a = (alpha * 255).toInt()
+    val r = (red * 255).toInt()
+    val g = (green * 255).toInt()
+    val b = (blue * 255).toInt()
+    return String.format("#%02X%02X%02X", r, g, b)
 }
 
 fun renderSvg(strokes: List<StrokeData>, width: Int, height: Int): String {
     val sb = StringBuilder()
-    sb.append("""
-        <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"$width\" height=\"$height\" viewBox=\"0 0 $width $height\">
-    """.trimIndent())
+
+    sb.append(
+        """<svg xmlns="http://www.w3.org/2000/svg" width="$width" height="$height" viewBox="0 0 $width $height" shape-rendering="geometricPrecision">"""
+    )
+
     val minDim = min(width, height).toFloat()
+
     strokes.forEach { s ->
-        if (s.points.isEmpty()) return@forEach
+        val pts = densifyNormalized(s.points, width, height)  // <— key line
+        if (pts.isEmpty()) return@forEach
+
         val d = buildString {
-            val f = s.points.first()
-            append("M ")
-            append(f.x * width)
-            append(' ')
-            append(f.y * height)
-            for (i in 1 until s.points.size) {
-                val pt = s.points[i]
-                append(" L ")
-                append(pt.x * width)
-                append(' ')
-                append(pt.y * height)
+            append("M ${pts.first().x * width} ${pts.first().y * height}")
+            for (i in 1 until pts.size) {
+                val pt = pts[i]
+                append(" L ${pt.x * width} ${pt.y * height}")
             }
         }
         val strokeWidth = s.widthFraction * minDim
-        sb.append("<path d=\"")
-        sb.append(d)
-        sb.append("\" fill=\"none\" stroke=\"black\" stroke-width=\"$strokeWidth\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
+        sb.append(
+            """<path d="$d" fill="none" stroke="${s.color.toSvgHex()}" stroke-width="$strokeWidth" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>"""
+        )
     }
     sb.append("</svg>")
     return sb.toString()
