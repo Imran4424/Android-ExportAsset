@@ -14,34 +14,34 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.luminous.exportasset.ui.theme.ExportAssetTheme
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            ExportAssetTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+        override fun onCreate(savedInstanceState: Bundle?) {
+                super.onCreate(savedInstanceState)
+                enableEdgeToEdge()
+                setContent {
+                        ExportAssetTheme {
+                                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                                        Greeting(
+                                                name = "Android",
+                                                modifier = Modifier.padding(innerPadding)
+                                        )
+                                }
+                        }
                 }
-            }
         }
-    }
 }
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+        Text(
+                text = "Hello $name!",
+                modifier = modifier
+        )
 }
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
-    ExportAssetTheme {
-        Greeting("Android")
-    }
+        ExportAssetTheme {
+                Greeting("Android")
+        }
 }
