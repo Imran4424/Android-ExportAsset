@@ -158,7 +158,9 @@ fun DrawingApp() {
                                                                 BgMode.Transparent -> null
                                                         }
                                                         val bmp = renderBitmap(strokes, exportSize, exportSize, backgroundColor = bgColor)
-                                                        val uri = savePng(context, bmp, "canvas_${exportSize}.png")
+                                                        val time = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US)
+                                                                .format(java.util.Date())
+                                                        val uri = savePng(context, bmp, "canvas_${exportSize}_$time.png")
                                                         withContext(Dispatchers.Main) {
                                                                 Toast.makeText(context, if (uri != null) "PNG saved" else "Save failed", Toast.LENGTH_SHORT).show()
                                                         }
@@ -172,7 +174,9 @@ fun DrawingApp() {
                                                                 BgMode.Transparent -> null
                                                         }
                                                         val svg = renderSvg(strokes, exportSize, exportSize, backgroundColor = bgColor)
-                                                        val ok = saveSvg(context, svg, "canvas_${exportSize}.svg")
+                                                        val time = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US)
+                                                                .format(java.util.Date())
+                                                        val ok = saveSvg(context, svg, "canvas_${exportSize}_$time.svg")
                                                         withContext(Dispatchers.Main) {
                                                                 Toast.makeText(context, if (ok) "SVG saved" else "Save failed", Toast.LENGTH_SHORT).show()
                                                         }
