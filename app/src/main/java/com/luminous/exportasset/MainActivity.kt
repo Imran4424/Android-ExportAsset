@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,10 +35,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { DrawingApp() }
-    }
+        override fun onCreate(savedInstanceState: Bundle?) {
+                super.onCreate(savedInstanceState)
+                setContent { DrawingApp() }
+        }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,7 +47,7 @@ fun DrawingApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var exportSize by remember { mutableIntStateOf(256) } // px, always square
+    var exportSize by remember { mutableIntStateOf(256) }
     val sizes = listOf(128, 256, 512, 1024)
 
     // Drawing state
@@ -54,17 +55,31 @@ fun DrawingApp() {
     var currentStroke by remember { mutableStateOf<StrokeData?>(null) }
     var canvasPxSize by remember { mutableStateOf(IntSize(0, 0)) }
 
-    val widthFraction = 0.012f // ~1.2% of min dim
+    val widthFraction = 0.012f
+
+    // --- simple preview size map so the on-screen canvas changes with dropdown ---
+    val previewSizeDp = remember(exportSize) {
+        when (exportSize) {
+            128 -> 220.dp
+            256 -> 300.dp
+            512 -> 360.dp
+            else -> 400.dp        // 1024
+        }
+    }
+
+    var sizeMenuOpen by remember { mutableStateOf(false) }
 
     MaterialTheme {
-        Scaffold(topBar = {
-            TopAppBar(title = {
-                Column {
-                    Text("Export Asset", fontWeight = FontWeight.Bold)
-                    Text("Export size: ${exportSize} × ${exportSize}", style = MaterialTheme.typography.labelMedium)
-                }
-            })
-        }) { padding ->
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text("Export Asset", fontWeight = FontWeight.Bold)
+                    }
+                )
+            }
+        ) { padding ->
+
             Column(
                 Modifier
                     .fillMaxSize()
@@ -72,28 +87,41 @@ fun DrawingApp() {
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Controls Row
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Dimension dropdown
-                    var expanded by remember { mutableStateOf(false) }
-                    OutlinedButton(onClick = { expanded = true }, shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Size: ${exportSize}")
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        sizes.forEach { s ->
-                            DropdownMenuItem(
-                                text = { Text("${s} × ${s} px") },
-                                onClick = { exportSize = s; expanded = false }
-                            )
+
+                // ---- Navigation bar (under app bar) ----
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // left: size dropdown
+                    Box {
+                        OutlinedButton(
+                            onClick = { sizeMenuOpen = true },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Size: $exportSize")
+                        }
+                        DropdownMenu(expanded = sizeMenuOpen, onDismissRequest = { sizeMenuOpen = false }) {
+                            sizes.forEach { s ->
+                                DropdownMenuItem(
+                                    text = { Text("$s × $s px") },
+                                    onClick = { exportSize = s; sizeMenuOpen = false }
+                                )
+                            }
                         }
                     }
 
                     Spacer(Modifier.weight(1f))
 
-                    // Export PNG
-                    FilledTonalButton(onClick = {
+                    // right: actions
+                    IconButton(onClick = { strokes.clear(); currentStroke = null }) {
+                        Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear")
+                    }
+                    IconButton(onClick = {
                         scope.launch(Dispatchers.IO) {
                             val bmp = renderBitmap(strokes, exportSize, exportSize)
                             val uri = savePng(context, bmp, "canvas_${exportSize}.png")
@@ -101,14 +129,9 @@ fun DrawingApp() {
                                 Toast.makeText(context, if (uri != null) "PNG saved" else "Save failed", Toast.LENGTH_SHORT).show()
                             }
                         }
-                    }, shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Filled.Image, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Export PNG")
-                    }
+                    }) { Icon(Icons.Filled.Image, contentDescription = "Export PNG") }
 
-                    // Export SVG
-                    Button(onClick = {
+                    IconButton(onClick = {
                         scope.launch(Dispatchers.IO) {
                             val svg = renderSvg(strokes, exportSize, exportSize)
                             val ok = saveSvg(context, svg, "canvas_${exportSize}.svg")
@@ -116,52 +139,53 @@ fun DrawingApp() {
                                 Toast.makeText(context, if (ok) "SVG saved" else "Save failed", Toast.LENGTH_SHORT).show()
                             }
                         }
-                    }, shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Filled.Download, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Export SVG")
-                    }
+                    }) { Icon(Icons.Filled.Download, contentDescription = "Export SVG") }
                 }
 
-                // Drawing Canvas area
+                // ---- Canvas (size reacts to exportSize) ----
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .background(Color(0xFFF7F7F7), RoundedCornerShape(16.dp))
-                        .padding(8.dp)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Canvas(
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .onSizeChanged { canvasPxSize = it }
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = { pos ->
-                                        if (canvasPxSize.width == 0 || canvasPxSize.height == 0) return@detectDragGestures
-                                        val norm = pos.toNormalized(canvasPxSize)
-                                        currentStroke = StrokeData(mutableStateListOf(norm), widthFraction, Color.Black)
-                                    },
-                                    onDrag = { change, _ ->
-                                        val s = currentStroke ?: return@detectDragGestures
-                                        s.points.add(change.position.toNormalized(canvasPxSize))
-                                    },
-                                    onDragEnd = {
-                                        currentStroke?.let { strokes.add(it) }
-                                        currentStroke = null
-                                    },
-                                    onDragCancel = { currentStroke = null }
-                                )
-                            }
+                            .size(previewSizeDp) // <-- key change: preview follows export size
+                            .border(2.dp, Color.Black, RoundedCornerShape(16.dp))
+                            .background(Color(0xFFF7F7F7), RoundedCornerShape(16.dp))
+                            .padding(8.dp)
                     ) {
-                        val size = this.size
-                        strokes.forEach { s -> drawStroke(s, size) }
-                        currentStroke?.let { drawStroke(it, size) }
+                        // recompose Canvas when preview size changes so onSizeChanged fires
+                        key(previewSizeDp) {
+                            Canvas(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .onSizeChanged { canvasPxSize = it }
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { pos ->
+                                                if (canvasPxSize.width == 0 || canvasPxSize.height == 0) return@detectDragGestures
+                                                val norm = pos.toNormalized(canvasPxSize)
+                                                currentStroke = StrokeData(mutableStateListOf(norm), widthFraction, Color.Black)
+                                            },
+                                            onDrag = { change, _ ->
+                                                val s = currentStroke ?: return@detectDragGestures
+                                                s.points.add(change.position.toNormalized(canvasPxSize))
+                                            },
+                                            onDragEnd = {
+                                                currentStroke?.let { strokes.add(it) }
+                                                currentStroke = null
+                                            },
+                                            onDragCancel = { currentStroke = null }
+                                        )
+                                    }
+                            ) {
+                                val size = this.size
+                                strokes.forEach { s -> drawStroke(s, size) }
+                                currentStroke?.let { drawStroke(it, size) }
+                            }
+                        }
                     }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { strokes.clear(); currentStroke = null }) { Text("Clear") }
                 }
             }
         }
@@ -170,23 +194,23 @@ fun DrawingApp() {
 
 // ---- helpers local to UI file ----
 private fun Offset.toNormalized(size: IntSize): Offset =
-    Offset(x / size.width.toFloat(), y / size.height.toFloat())
+        Offset(x / size.width.toFloat(), y / size.height.toFloat())
 
 private fun Offset.fromNormalized(size: Size): Offset =
-    Offset(x * size.width, y * size.height)
+        Offset(x * size.width, y * size.height)
 
 private fun Path.buildFrom(points: List<Offset>, size: Size) {
-    if (points.isEmpty()) return
-    val first = points.first().fromNormalized(size)
-    moveTo(first.x, first.y)
-    for (i in 1 until points.size) {
-        val p = points[i].fromNormalized(size)
-        lineTo(p.x, p.y)
-    }
+        if (points.isEmpty()) return
+        val first = points.first().fromNormalized(size)
+        moveTo(first.x, first.y)
+        for (i in 1 until points.size) {
+                val p = points[i].fromNormalized(size)
+                lineTo(p.x, p.y)
+        }
 }
 
 private fun DrawScope.drawStroke(s: StrokeData, size: Size) {
-    val path = Path().apply { buildFrom(s.points, size) }
-    val strokeWidthPx = s.widthFraction * min(size.width, size.height)
-    drawPath(path = path, color = s.color, style = Stroke(width = strokeWidthPx))
+        val path = Path().apply { buildFrom(s.points, size) }
+        val strokeWidthPx = s.widthFraction * min(size.width, size.height)
+        drawPath(path = path, color = s.color, style = Stroke(width = strokeWidthPx))
 }
