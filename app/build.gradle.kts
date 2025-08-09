@@ -49,6 +49,13 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    // Needed for Icons.Filled.*
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Needed for detectDragGestures (Compose Foundation)
+    implementation("androidx.compose.foundation:foundation")
+    implementation(libs.ui)
+    implementation(libs.ui.graphics)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
